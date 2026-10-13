@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Local Job Capture",
+  "version": "1.0.0",
+  "description": "Capture job adverts locally and optionally refine them with your configured LLM.",
+  "permissions": ["activeTab", "scripting", "storage", "downloads"],
+  "optional_host_permissions": ["https://*/*"],
+  "action": {
+    "default_title": "Capture job",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "options_page": "workspace.html",
+
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}
