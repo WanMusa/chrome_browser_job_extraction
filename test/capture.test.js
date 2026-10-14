@@ -228,6 +228,45 @@ test("LinkedIn signed-in header captures insight pills and pay without posting a
   assert.equal(result.salary_text, "NZD $115.00 - $125.00 p.h.");
 });
 
+test("LinkedIn classless header recovers the exported tab-title role and current-job metadata", () => {
+  const title = "Senior Business Analyst - Data & AI";
+  const description = "In The Moment\nLead discovery across Data & AI initiatives.";
+  const doc = fixture("www.linkedin.com", {
+    main: ["Navigation", "Genesis", title, "Auckland, Auckland, New Zealand · 2 days ago · 29 people clicked apply", "Responses managed off LinkedIn", "Hybrid", "Full-time", "Apply", "Use AI to assess how you fit", "Premium", "About the job", description, "More jobs", "Other company", "Wellington · 5 days ago", "Contract", "$200,000 per year"].join("\n"),
+    ".jobs-box__html-content": description
+  });
+  doc.title = `${title} | Genesis | LinkedIn`;
+  const result = extractPage(doc, new URL("https://www.linkedin.com/jobs/view/4478389067/"));
+  assert.equal(result.title, title);
+  assert.equal(result.company, "Genesis");
+  assert.equal(result.location, "Auckland, Auckland, New Zealand");
+  assert.equal(result.employment_type, "Full-time");
+  assert.equal(result.salary_text, null);
+  assert.equal(result.description_text, description);
+});
+
+test("LinkedIn classless fallback never scans recommendations when the job header is absent", () => {
+  const title = "Senior Business Analyst - Data & AI";
+  const doc = fixture("www.linkedin.com", { main: `About the job\nAdvert text\nMore jobs\nOther company\n${title}\nWellington · 5 days ago\nContract\n$200,000 per year` });
+  doc.title = `${title} | Genesis | LinkedIn`;
+  const result = extractPage(doc, new URL("https://www.linkedin.com/jobs/view/4478389067/"));
+  assert.equal(result.company, "Genesis");
+  assert.equal(result.location, null);
+  assert.equal(result.employment_type, null);
+  assert.equal(result.salary_text, null);
+});
+
+test("LinkedIn classless header handles hourly pay and location without posting activity", () => {
+  const doc = fixture("www.linkedin.com", {
+    main: "Robert Half\nBusiness Analyst\nAuckland CBD, Auckland\nContract\nNZD $115.00 - $125.00 p.h.\nAbout the job\nInsurance experience is a must"
+  });
+  doc.title = "Business Analyst | Robert Half | LinkedIn";
+  const result = extractPage(doc, new URL("https://www.linkedin.com/jobs/view/123/"));
+  assert.equal(result.location, "Auckland CBD, Auckland");
+  assert.equal(result.employment_type, "Contract");
+  assert.equal(result.salary_text, "NZD $115.00 - $125.00 p.h.");
+});
+
 test("LinkedIn salary reads explicit compensation or pay in the advert, not benefit amounts", () => {
   const url = new URL("https://www.linkedin.com/jobs/view/123/");
   const doc = fixture("www.linkedin.com", { ".compensation__salary": "$110K/yr - $150K/yr", ".show-more-less-html__markup": "Build systems" });

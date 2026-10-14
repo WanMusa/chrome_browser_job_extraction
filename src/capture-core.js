@@ -73,7 +73,26 @@ function listedLocation(document) {
   return country;
 }
 
+function linkedInTextHeader(document) {
+  const parts = String(document.title || "").split(/\s+\|\s+/);
+  const branded = /^LinkedIn$/i.test(parts.at(-1)?.trim() || "");
+  if (branded) parts.pop();
+  const company = branded && parts.length >= 2 ? parts.pop().trim() : null;
+  const title = company ? parts.join(" | ").trim() : null;
+  const main = document.querySelector("main") || document.body;
+  const lines = cleanText(main?.innerText || textOf(main)).split("\n");
+  const start = title ? lines.findIndex((line) => line === title) : -1;
+  const contentStart = lines.findIndex((line) => /^(?:About (?:the|this) job|About the company|More jobs)$/i.test(line));
+  if (start < 0 || (contentStart >= 0 && start > contentStart)) return { title, company, lines: [], location: null };
+  const end = lines.findIndex((line, index) => index > start && /^(?:About (?:the|this) job|Use AI to assess how you fit|People you can reach out to|About the company|More jobs)$/i.test(line));
+  const headerLines = lines.slice(start + 1, Math.min(end < 0 ? lines.length : end, start + 25));
+  const locationLine = headerLines.find((line) => /\u00b7/.test(line) && /(?:ago|applicants?|clicked apply|reposted)/i.test(line))
+    || headerLines.slice(0, 3).find((line) => line !== company && /,/.test(line) && !/\d|salary|pay/i.test(line));
+  return { title, company, lines: headerLines, location: locationLine?.split(/\s*\u00b7\s*/)[0].trim() || null };
+}
+
 function linkedInMetadata(document, description) {
+  const fallback = linkedInTextHeader(document);
   const header = document.querySelector(".job-details-jobs-unified-top-card__container")
     || document.querySelector(".jobs-unified-top-card")
     || document.querySelector(".top-card-layout");
@@ -81,9 +100,9 @@ function linkedInMetadata(document, description) {
   const company = firstText(root, [
     ".job-details-jobs-unified-top-card__company-name", ".jobs-unified-top-card__company-name",
     ".topcard__org-name-link", "[itemprop='hiringOrganization']"
-  ]);
-  const location = listedLocation(root)?.split(/\s*(?:\u00b7|\n)\s*/)[0].trim() || null;
-  const headerLines = header ? cleanText(header.innerText || header.textContent).split("\n") : [];
+  ]) || fallback.company;
+  const location = listedLocation(root)?.split(/\s*(?:\u00b7|\n)\s*/)[0].trim() || fallback.location;
+  const headerLines = header ? cleanText(header.innerText || header.textContent).split("\n") : fallback.lines;
   let employment = null;
   for (const item of document.querySelectorAll(".description__job-criteria-item")) {
     const label = firstText(item, [".description__job-criteria-subheader", "h3"]);
@@ -103,7 +122,7 @@ function linkedInMetadata(document, description) {
     || firstText(document, [".compensation__salary"])
     || [...headerLines, ...cleanText(description).split("\n")].find((line) => hasMoney.test(line) && hasPayPeriod.test(line))
     || null;
-  return { company, location, employment, salary };
+  return { title: fallback.title, company, location, employment, salary };
 }
 
 function linkedInFallback(text) {
@@ -183,7 +202,7 @@ function extractPage(document, location, selectionText = "", mode = "page") {
   return {
     source_url: canonicalUrl(location.href),
     site,
-    title: title || document.title || null,
+    title: title || linkedIn?.title || document.title || null,
     company,
     location: locationText,
     description_text: cleanText(description),
