@@ -1,31 +1,11 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  llmEnabled: false,
-  extraction: {
-    provider: "vps",
-    model: "gpt-4.1-mini",
-    baseUrl: "https://localgemma.wanagents.duckdns.org",
-    token: "",
-    extractPath: "/extract-job",
-    statusPath: "/llm/status",
-    wakePath: "/llm/wake",
-    timeoutSeconds: 180,
-    supportsStatus: true,
-    supportsWake: true,
-    promptMode: "server",
-    systemPrompt: "",
-    extraInstructions: "",
-    maxInputChars: 30000
-  },
   inbox: { baseUrl: "", token: "", path: "/jobs", enabled: false },
   export: {
     format: "json",
-    filenamePattern: "jobs-{date}",
-    includeRefinedArrays: true,
     saveAs: true
-  },
-  inactivityMinutes: 10
+  }
 });
 
 export function createJob(captured) {
@@ -40,13 +20,7 @@ export function createJob(captured) {
     location: captured.location || null,
     description_text: String(captured.description_text || "").trim(),
     employment_type: captured.employment_type || null,
-    salary_text: captured.salary_text || null,
-    extraction_mode: "raw",
-    requirements: [],
-    responsibilities: [],
-    skills: [],
-    notes: null,
-    warnings: Array.isArray(captured.warnings) ? [...captured.warnings] : []
+    salary_text: captured.salary_text || null
   };
 }
 
@@ -68,14 +42,7 @@ export function normalizeState(input) {
       location: item.location || null,
       description_text: String(raw),
       employment_type: item.employment_type || null,
-      salary_text: item.salary_text || null,
-      extraction_mode: item.extraction_mode === "llm_refined" ? "llm_refined" : "raw",
-      requirements: Array.isArray(item.requirements) ? item.requirements : [],
-      responsibilities: Array.isArray(item.responsibilities) ? item.responsibilities : [],
-      skills: Array.isArray(item.skills) ? item.skills : [],
-      notes: item.notes || null,
-      warnings: Array.isArray(item.warnings) ? item.warnings : [],
-      ...(item.operationState ? { operationState: item.operationState } : {})
+      salary_text: item.salary_text || null
     };
   });
   const oldSettings = input.settings && typeof input.settings === "object" ? input.settings : {};
@@ -83,16 +50,16 @@ export function normalizeState(input) {
     schemaVersion: SCHEMA_VERSION,
     jobs,
     settings: {
-      ...structuredClone(DEFAULT_SETTINGS),
-      ...oldSettings,
-      extraction: { ...DEFAULT_SETTINGS.extraction, ...(oldSettings.extraction || {}) },
       inbox: { ...DEFAULT_SETTINGS.inbox, ...(oldSettings.inbox || {}) },
-      export: { ...DEFAULT_SETTINGS.export, ...(oldSettings.export || {}) }
+      export: {
+        format: ["json", "csv", "markdown"].includes(oldSettings.export?.format) ? oldSettings.export.format : DEFAULT_SETTINGS.export.format,
+        saveAs: oldSettings.export?.saveAs ?? DEFAULT_SETTINGS.export.saveAs
+      }
     }
   };
 }
 
-export function exportJob(job, includeRefinedArrays = true) {
+export function exportJob(job) {
   const result = {
     id: job.id,
     source_url: job.source_url,
@@ -103,13 +70,7 @@ export function exportJob(job, includeRefinedArrays = true) {
     location: job.location,
     description_text: job.description_text,
     employment_type: job.employment_type,
-    salary_text: job.salary_text,
-    extraction_mode: job.extraction_mode,
-    requirements: includeRefinedArrays ? job.requirements : [],
-    responsibilities: includeRefinedArrays ? job.responsibilities : [],
-    skills: includeRefinedArrays ? job.skills : [],
-    notes: includeRefinedArrays ? job.notes : null,
-    warnings: job.warnings
+    salary_text: job.salary_text
   };
   return result;
 }

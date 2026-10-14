@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createJob, exportJob } from "../src/model.js";
-import { toCsv, toMarkdown } from "../src/export.js";
+import { createJob, exportJob, normalizeState, SCHEMA_VERSION } from "../src/model.js";
+import { exportFilename, toCsv, toMarkdown } from "../src/export.js";
 import { parseRefinement, refinementFailure } from "../src/refinement.js";
 import { extractionEndpoint, OPENAI_EXTRACT_URL, requestRefinement } from "../src/extraction-api.js";
 
@@ -12,7 +12,7 @@ const source = {
   description_text: "Requirements:\n5+ years experience\nExperience with C#, SQL"
 };
 
-test("raw and refined exports retain the same lean outer schema and source text", () => {
+test("captures and exports contain only advert metadata and source text", () => {
   const raw = createJob(source);
   const refined = { ...raw, extraction_mode: "llm_refined", requirements: ["5+ years experience"] };
   const rawPayload = exportJob(raw);
@@ -20,8 +20,26 @@ test("raw and refined exports retain the same lean outer schema and source text"
   assert.deepEqual(Object.keys(rawPayload), Object.keys(refinedPayload));
   assert.equal(rawPayload.description_text, source.description_text);
   assert.equal(refinedPayload.description_text, source.description_text);
-  assert.equal(rawPayload.extraction_mode, "raw");
-  assert.equal(refinedPayload.extraction_mode, "llm_refined");
+  assert.deepEqual(Object.keys(rawPayload), ["id", "source_url", "site", "captured_at", "title", "company", "location", "description_text", "employment_type", "salary_text"]);
+  assert.deepEqual(Object.keys(raw), Object.keys(rawPayload));
+});
+
+test("legacy jobs migrate without changing source text or retaining removed fields", () => {
+  const raw = createJob(source);
+  const migrated = normalizeState({ schemaVersion: 1, jobs: [{ ...raw, extraction_mode: "raw", requirements: ["legacy"], responsibilities: [], skills: [], notes: "old", warnings: ["old"], operationState: "refining" }], settings: { llmEnabled: true, extraction: { token: "legacy-key" }, export: { format: "csv", saveAs: false, includeRefinedArrays: true } } });
+  assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
+  assert.deepEqual(migrated.jobs[0], raw);
+  assert.deepEqual(migrated.settings.export, { format: "csv", saveAs: false });
+  assert.equal("extraction" in migrated.settings, false);
+});
+
+test("export filenames use local MMDDYYYY, role, company and source with safe fallbacks", () => {
+  const job = { title: "Business Analyst", company: "Genesis", site: "linkedin" };
+  const date = new Date(2026, 9, 15);
+  assert.equal(exportFilename([job], "json", date), "10152026-BusinessAnalyst-genesis-linkedin.json");
+  assert.equal(exportFilename([job, job], "csv", date), "10152026-jobs-2.csv");
+  assert.equal(exportFilename([{}], "markdown", date), "10152026-UntitledRole-unknown-other.md");
+  assert.doesNotMatch(exportFilename([{ title: 'Role: /?*<>|', company: 'Company\\name', site: "other" }], "json", date), /[<>:"/\\|?*]/);
 });
 
 test("CSV escapes quotes and preserves multiline cells", () => {
@@ -30,10 +48,10 @@ test("CSV escapes quotes and preserves multiline cells", () => {
   assert.match(csv, /"line one\nline two"/);
 });
 
-test("Markdown renders the source and optional refined fields", () => {
+test("Markdown renders the source without removed structured sections", () => {
   const markdown = toMarkdown([{ ...createJob(source), skills: ["C#", "SQL"] }]);
   assert.match(markdown, /## Description\n\nRequirements:\n5\+ years experience/);
-  assert.match(markdown, /## Skills\n\n- C#\n- SQL/);
+  assert.doesNotMatch(markdown, /## Skills|## Requirements|## Responsibilities|## Notes/);
 });
 
 test("malformed extractor JSON is rejected without changing the capture", () => {

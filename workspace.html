@@ -9,9 +9,6 @@
 <body>
   <header class="topbar">
     <div><h1>Job workspace</h1><p>Local-first job basket · raw text is always preserved</p></div>
-    <div class="top-actions">
-    <button id="model-status" class="status unknown" type="button">Check model</button>
-    </div>
   </header>
   <main>
     <nav class="tabs" aria-label="Workspace sections">
@@ -20,8 +17,6 @@
     </nav>
     <section id="jobs-view">
       <div class="toolbar">
-        <label><input id="llm-enabled" type="checkbox"> Enable optional LLM refinement</label>
-        <button id="refine-selected">Refine selected</button>
         <button id="export-selected" class="secondary">Export selected</button>
         <button id="export-all" class="secondary">Export all</button>
         <button id="send-selected" class="secondary" disabled title="Configure inbox sending in Settings">Send selected</button>
@@ -35,37 +30,9 @@
     </section>
     <section id="settings-view" hidden>
       <form id="settings-form">
-        <h2>Extraction connection</h2>
-        <label class="check"><input name="llmEnabled" type="checkbox"> Enable LLM refinement (default off)</label>
-        <label>Provider
-          <select name="provider"><option value="vps">VPS extraction API (Gemma)</option><option value="openai">OpenAI (direct)</option></select>
-        </label>
-        <label id="openai-model" hidden>OpenAI model <input name="model" type="text" placeholder="gpt-4.1-mini"></label>
-        <label>HTTPS API base URL <input name="baseUrl" type="url" placeholder="https://localgemma.wanagents.duckdns.org"></label>
-        <label><span id="connection-token-label">API bearer token</span> <input name="token" type="password" autocomplete="new-password"></label>
-        <div class="grid">
-          <label>Extract path <input name="extractPath" type="text"></label>
-          <label>Status path <input name="statusPath" type="text"></label>
-          <label>Wake path <input name="wakePath" type="text"></label>
-          <label>Request timeout (seconds) <input name="timeoutSeconds" type="number" min="10" max="600"></label>
-          <label>Maximum input characters <input name="maxInputChars" type="number" min="1000" max="200000"></label>
-          <label>Inactivity timeout (minutes) <input name="inactivityMinutes" type="number" min="1" max="120"></label>
-        </div>
-        <label class="check"><input name="supportsStatus" type="checkbox"> API supports model status</label>
-        <label class="check"><input name="supportsWake" type="checkbox"> API supports model wake</label>
-        <label>Prompt mode
-          <select name="promptMode"><option value="server">Default instructions</option><option value="custom">Custom override</option></select>
-        </label>
-        <label>Custom system prompt override <textarea name="systemPrompt" rows="4"></textarea></label>
-        <label>Extra instructions <textarea name="extraInstructions" rows="3"></textarea></label>
-
         <h2>Export behavior</h2>
-        <div class="grid">
-          <label>Default format <select name="format"><option value="json">JSON</option><option value="csv">CSV</option><option value="markdown">Markdown</option></select></label>
-          <label>Filename pattern <input name="filenamePattern" type="text"></label>
-        </div>
+        <label>Default format <select name="format"><option value="json">JSON</option><option value="csv">CSV</option><option value="markdown">Markdown</option></select></label>
         <label class="check"><input name="saveAs" type="checkbox"> Ask where to save each export</label>
-        <label class="check"><input name="includeRefinedArrays" type="checkbox"> Include refined arrays in exports</label>
 
         <h2>Inbox destination</h2>
         <p class="muted">Optional JSON POST endpoint. Sending remains disabled until explicitly enabled and configured.</p>

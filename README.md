@@ -1,56 +1,72 @@
 # Local Job Capture
 
-A Manifest V3 Chrome extension for capturing visible Seek, LinkedIn, and other job advert text into a local review basket. Capture and JSON/CSV/Markdown export work offline. LLM refinement is optional and off by default.
+A Manifest V3 Chrome extension for capturing Seek, LinkedIn, and other job adverts into a local review basket. Capture, editing, and export work offline and do not use an LLM.
 
 ## Install and develop
 
-This project uses plain, locally bundled JavaScript, HTML, and CSS; there are no runtime packages, remote scripts, CDNs, or compilation step.
+1. Install Node.js 20 or newer, then run `npm test` and `npm run build` in this repository.
+2. In Chrome, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the folder containing `manifest.json`.
+3. After source updates, click **Reload** on the extension and refresh job tabs. The extension loads directly from source; `npm run build` performs syntax checks, not packaging.
 
-1. Install Node.js 20 or newer for checks, and clone/open this repository in VS Code.
-2. Run `npm test` and `npm run build` from the repository root.
-3. In Chrome, open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the repository folder containing `manifest.json`.
-4. Open a job advert. Use the extension toolbar button to capture the page or selected text. Open the workspace to review/edit jobs, configure settings, refine, and export.
+## Capture
 
-For development updates, run `git pull`, run `npm test` / `npm run build`, then open `chrome://extensions` and click **Reload** for this extension. The extension can be loaded directly from the source tree; `npm run build` performs reproducible syntax checks rather than creating a different package.
+- Right-click a job page and choose **Capture job page**.
+- Select the advert text, right-click, and choose **Capture selected job text**.
+- Press **Alt+Shift+J** to capture the current page without opening the popup. Chrome may leave a shortcut unassigned if it conflicts with another extension or OS shortcut. Customize it at `chrome://extensions/shortcuts`; a separate selection-capture command can also be assigned there.
+- The popup still offers page capture, selection capture, and **Open workspace**.
 
-## Capture and privacy
+The extension icon shows `OK` after a successful capture or `!` after a failure. Hover over the icon for the result or error. Captures made by menu/shortcut appear in an already-open workspace automatically. Duplicate URLs are kept as separate captures rather than overwriting edited jobs. No floating buttons are injected into websites.
 
-- The popup reads rendered page text from the current tab; it does not fetch job URLs or send page HTML.
-- Seek and LinkedIn description containers are preferred, with a generic visible-text fallback. Selected-text capture remains available when a page adapter does not find the description.
-- Headings and line breaks are retained. Obvious navigation, buttons, scripts, ads, cookie/login prompts, duplicate lines, and zero-width characters are removed. Expand collapsed advert sections before capturing; warnings are shown when likely truncated content is noticed.
-- Captures, edits, and settings are stored in `chrome.storage.local`. The extension does not save raw HTML. Duplicate URLs are retained as separate captures with a warning rather than overwriting edits.
-- API credentials are only used by extension pages. The extension requests optional, origin-scoped HTTPS host access when the user configures or invokes an API action. Never export or share a settings backup containing tokens.
+Expand the full advert before capturing. Seek and LinkedIn description containers are preferred. LinkedIn selects the narrow advert instead of a longer page wrapper; fallback isolates `About the job` and stops before recommendation, company, and Premium UI sections. If it cannot isolate the advert, select the text and use selection capture. Other sites retain a generic visible-text fallback.
 
-## Configure the Gemma API
+Headings, paragraph/list boundaries, hard requirements, reference numbers, and numeric thresholds are retained without summarizing. Cleanup targets known ad containers and standalone navigation text, not arbitrary class names containing `advert` or `ads`. City/district location matches take precedence over country-only matches when available.
 
-Open **Settings** in the workspace:
+## Review and schema
 
-- Set the extraction HTTPS base URL (default: `https://localgemma.wanagents.duckdns.org`), bearer token, endpoint paths, timeout, and capability toggles.
-- The expected API contract follows `ai-platform_local-llm`: `GET /llm/status`, `POST /llm/wake`, and `POST /extract-job`. The extract request sends `source_url`, `site`, `page_title`, `cleaned_text`, and optional custom prompt fields. The response's extracted fields are validated before they are applied.
-- Model selection remains server-managed; this extension does not send a per-request model name.
-- Choose server-managed prompt mode or custom override / extra instructions. The LLM receives only the cleaned advert text and small metadata fields—not HTML, browser history, or unrelated jobs.
-- Set the maximum input-character warning budget and inactivity timeout. The default timeout is 10 minutes; it stops status monitoring and marks the status stale, but does not cancel an active extraction.
-- The single model button checks status, wakes a sleeping model, and polls every four seconds only while warming (with a three-minute cap). It checks once when the workspace opens if refinement is enabled. Refinement requests are serial; timed-out/in-flight work is marked interrupted and is never automatically replayed.
+The workspace lets you edit title, company, location, employment type, salary, and the job description; select jobs; export; and delete captures. There are no model connection, refinement, or structured requirement/skills panels.
 
-LLM refinement is off by default. Refined fields organize/categorize the job; `description_text` remains the cleaned source of truth and is never overwritten. The server may sleep or be unavailable without affecting local capture and export.
+Saved and exported job records use schema version **2**, with these fields only:
 
-## Direct OpenAI connection
+```json
+{
+  "id": "generated-id",
+  "source_url": "https://www.linkedin.com/jobs/view/123/",
+  "site": "linkedin",
+  "captured_at": "2026-10-15T12:00:00.000Z",
+  "title": "Business Analyst",
+  "company": "Genesis",
+  "location": "Auckland CBD",
+  "description_text": "Full captured advert text",
+  "employment_type": "Full-time",
+  "salary_text": null
+}
+```
 
-In workspace Settings, choose **OpenAI (direct)**, enter an OpenAI API key and model (default: `gpt-4.1-mini`), enable LLM refinement, and save. Grant Chrome access to `https://api.openai.com` when prompted. The extension sends requests directly to `https://api.openai.com/v1/chat/completions`; no VPS change is needed. Model status/wake controls are unavailable for this provider.
+Existing storage migrates automatically, preserving source text and metadata while dropping extraction mode, requirements, responsibilities, skills, notes, warnings, operation state, and old LLM settings/credentials. Those removed fields are not retained in a backup; export an old version first if you need them. Existing captures are not re-scraped: re-capture an advert to recover text omitted by an older scraper.
 
-The key is stored locally in `chrome.storage.local`, not encrypted in a credential vault. Use a dedicated project/key with appropriate spending limits; never share the key or commit it. OpenAI API billing is separate from ChatGPT subscriptions. Refinement sends the captured job text to OpenAI and may incur charges. Switching providers clears the credential field, so re-enter the matching key/token before saving.
+## Export
 
-## Review, export, and inbox
+JSON exports create **one file per job**, including when using **Export selected** or **Export all**. Each file retains the envelope `{ "schema_version": 2, "exported_at": "...", "jobs": [...] }` with one job.
 
-The workspace supports editing source text and metadata, selecting/deleting jobs, and serial refinement. JSON is the preferred batch format and preserves the same compact job envelope for raw and refined captures. CSV properly quotes multiline fields; Markdown is intended for reading. The export settings control default format, filename pattern, save-as behavior, and inclusion of refined arrays. Downloads use Chrome's download API; the extension does not write arbitrary filesystem paths.
+Names use the local export date in **MMDDYYYY**, whitespace-free role name, lowercase company, and source:
 
-Inbox configuration is separate from extraction settings. Sending is explicit and disabled until an HTTPS base URL, path, and enabled setting are configured. The current inbox contract is a JSON POST with `{ "schema_version": 1, "jobs": [...] }`; configure it only for a compatible receiver.
+```text
+10152026-BusinessAnalyst-genesis-linkedin.json
+```
 
-## Validation and manual checks
+Unsafe filename characters are removed and missing metadata uses `UntitledRole`, `unknown`, and `other`. Chrome adds a suffix when a filename already exists, rather than overwriting it. Choose whether to ask for a save location in Settings; multiple JSON jobs produce multiple save prompts when enabled.
 
-Automated tests cover text fidelity/cleaning, adapter and selected-text fallback behavior, raw/refined schema consistency, polling/inactivity policy, malformed model output/timeouts, CSV/Markdown serialization, and state migration. `npm run build` syntax-checks the extension JavaScript.
+CSV and Markdown remain batch exports. A single-job file uses the same descriptive naming; multiple-job batches use names such as `10152026-jobs-3.csv`. All formats omit the removed fields.
 
-Real Chrome DOM behavior, Seek/LinkedIn markup changes, permission prompts, downloads, and live VPS authentication/network/API compatibility still require manual testing in Chrome. No live endpoint or credential is needed for the automated tests.
+## Inbox and privacy
+
+An optional HTTPS JSON POST inbox can be configured in Settings for a future resume generator. It receives `{ "schema_version": 2, "jobs": [...] }` only after you explicitly select **Send selected**. Sending stays disabled until configured and enabled. Endpoint paths must remain on the configured origin, and Chrome requests optional host access when needed.
+
+Capture reads the current page's text; it does not fetch job URLs or save raw HTML. Jobs and settings stay in `chrome.storage.local`. Storage access is restricted to trusted extension contexts. Inbox bearer tokens are local settings, not encrypted-vault credentials; never share them or commit them.
+
+## Validation
+
+`npm test` covers capture fidelity, scoped LinkedIn fallback, location matching, repeated script injection, menu/keyboard/popup routing, capture errors and queued saves, schema migration, export fields, and filename safety. `npm run build` checks JavaScript syntax. Chrome's native context menus, OS shortcut conflicts, real download prompts, and current website markup still require manual verification in Chrome.
 
 ## License
 

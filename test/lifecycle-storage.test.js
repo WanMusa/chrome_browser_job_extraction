@@ -83,7 +83,8 @@ test("legacy storage migrates to the current version with defaults", async () =>
   assert.equal(state.schemaVersion, SCHEMA_VERSION);
   assert.equal(state.jobs[0].source_url, "https://example.test/job");
   assert.equal(state.jobs[0].description_text, "Required: 4 years");
-  assert.equal(state.settings.llmEnabled, false);
+  assert.equal("llmEnabled" in state.settings, false);
+  assert.equal(state.settings.export.format, "json");
   assert.equal(stored.schemaVersion, SCHEMA_VERSION);
   delete globalThis.chrome;
 });

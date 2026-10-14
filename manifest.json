@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Local Job Capture",
   "version": "1.0.0",
-  "description": "Capture job adverts locally and optionally refine them with your configured LLM.",
-  "permissions": ["activeTab", "scripting", "storage", "downloads"],
+  "description": "Capture job adverts locally from the page menu, keyboard shortcut, or popup, then review and export.",
+  "permissions": ["activeTab", "scripting", "storage", "downloads", "contextMenus"],
   "optional_host_permissions": ["https://*/*"],
   "action": {
     "default_title": "Capture job",
@@ -14,6 +14,15 @@
     "type": "module"
   },
   "options_page": "workspace.html",
+  "commands": {
+    "capture-job-page": {
+      "suggested_key": { "default": "Alt+Shift+J" },
+      "description": "Capture the current job page"
+    },
+    "capture-job-selection": {
+      "description": "Capture selected job text"
+    }
+  },
 
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"
