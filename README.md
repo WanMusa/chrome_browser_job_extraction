@@ -34,6 +34,12 @@ Open **Settings** in the workspace:
 
 LLM refinement is off by default. Refined fields organize/categorize the job; `description_text` remains the cleaned source of truth and is never overwritten. The server may sleep or be unavailable without affecting local capture and export.
 
+## Direct OpenAI connection
+
+In workspace Settings, choose **OpenAI (direct)**, enter an OpenAI API key and model (default: `gpt-4.1-mini`), enable LLM refinement, and save. Grant Chrome access to `https://api.openai.com` when prompted. The extension sends requests directly to `https://api.openai.com/v1/chat/completions`; no VPS change is needed. Model status/wake controls are unavailable for this provider.
+
+The key is stored locally in `chrome.storage.local`, not encrypted in a credential vault. Use a dedicated project/key with appropriate spending limits; never share the key or commit it. OpenAI API billing is separate from ChatGPT subscriptions. Refinement sends the captured job text to OpenAI and may incur charges. Switching providers clears the credential field, so re-enter the matching key/token before saving.
+
 ## Review, export, and inbox
 
 The workspace supports editing source text and metadata, selecting/deleting jobs, and serial refinement. JSON is the preferred batch format and preserves the same compact job envelope for raw and refined captures. CSV properly quotes multiline fields; Markdown is intended for reading. The export settings control default format, filename pattern, save-as behavior, and inclusion of refined arrays. Downloads use Chrome's download API; the extension does not write arbitrary filesystem paths.

@@ -3,6 +3,8 @@ export const SCHEMA_VERSION = 1;
 export const DEFAULT_SETTINGS = Object.freeze({
   llmEnabled: false,
   extraction: {
+    provider: "vps",
+    model: "gpt-4.1-mini",
     baseUrl: "https://localgemma.wanagents.duckdns.org",
     token: "",
     extractPath: "/extract-job",

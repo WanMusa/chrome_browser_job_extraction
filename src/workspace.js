@@ -1,9 +1,9 @@
-import { exportJob } from "./model.js";
+import { DEFAULT_SETTINGS, exportJob } from "./model.js";
 import { loadState, saveState } from "./storage.js";
 import { StatusMonitor, statusIsStale } from "./lifecycle.js";
 import { toCsv, toMarkdown } from "./export.js";
 import { parseRefinement, refinementFailure } from "./refinement.js";
-import { requestRefinement } from "./extraction-api.js";
+import { extractionEndpoint, OPENAI_EXTRACT_URL, requestRefinement } from "./extraction-api.js";
 
 let state;
 let selectedId = null;
@@ -77,7 +77,7 @@ function isMonitoringIdle() {
 
 async function checkModel() {
   const profile = state.settings.extraction;
-  if (!profile.supportsStatus) {
+  if (profile.provider === "openai" || !profile.supportsStatus) {
     setModelState("unknown", "Status endpoint is disabled in Settings.");
     return;
   }
@@ -145,6 +145,7 @@ function safeText(tag, text, className) {
 function renderJobs() {
   const list = $("#job-list");
   list.replaceChildren();
+  $("#model-status").hidden = state.settings.extraction.provider === "openai";
   $("#job-count").textContent = `(${state.jobs.length})`;
   $("#llm-enabled").checked = state.settings.llmEnabled;
   $("#send-selected").disabled = !(
@@ -252,7 +253,7 @@ async function updateDetail(event) {
 }
 
 async function persist() {
-  state = await saveState(state);
+  await saveState(state);
 }
 
 function selectedJobs() {
@@ -291,21 +292,23 @@ async function downloadJobs(jobs) {
 async function refine(job) {
   if (!state.settings.llmEnabled) throw new Error("Enable LLM refinement in Settings or the Jobs toolbar first.");
   const profile = state.settings.extraction;
+  const supportsStatus = profile.provider !== "openai" && profile.supportsStatus;
   if (job.description_text.length > profile.maxInputChars) {
     throw new Error(`This advert is ${job.description_text.length} characters, above your ${profile.maxInputChars} character warning budget. Edit it before refining.`);
   }
-  if (profile.supportsStatus && modelState !== "ready") {
+  if (supportsStatus && modelState !== "ready") {
     if (modelIsStale()) await checkModel();
     if (modelState !== "ready") throw new Error("The model is not ready. Use the model status button to check or wake it, then retry.");
-  } else if (profile.supportsStatus && modelIsStale()) {
+  } else if (supportsStatus && modelIsStale()) {
     await checkModel();
     if (modelState !== "ready") throw new Error("The model is not ready. Use the model status button to check or wake it, then retry.");
   }
-  const url = endpoint(profile, profile.extractPath);
+  const url = extractionEndpoint(profile);
   await ensureOriginPermission(url);
   job.operationState = "refining";
   await persist();
   renderJobs();
+  notice(`Refining ${job.title || "job"}…`);
   try {
     const data = await requestRefinement(fetch, url, profile, job);
     const result = parseRefinement(data);
@@ -377,11 +380,30 @@ function field(form, name) {
   return form.elements.namedItem(name);
 }
 
+function syncConnectionFields(changed = false) {
+  const form = $("#settings-form");
+  const openai = field(form, "provider").value === "openai";
+  if (changed) {
+    field(form, "token").value = "";
+    field(form, "baseUrl").value = openai ? "https://api.openai.com/v1" : DEFAULT_SETTINGS.extraction.baseUrl;
+    field(form, "extractPath").value = openai ? "/v1/chat/completions" : DEFAULT_SETTINGS.extraction.extractPath;
+    field(form, "supportsStatus").checked = !openai;
+    field(form, "supportsWake").checked = !openai;
+  }
+  $("#openai-model").hidden = !openai;
+  field(form, "model").disabled = !openai;
+  $("#connection-token-label").textContent = openai ? "OpenAI API key" : "API bearer token";
+  for (const name of ["baseUrl", "extractPath"]) field(form, name).readOnly = openai;
+  for (const name of ["statusPath", "wakePath", "supportsStatus", "supportsWake", "inactivityMinutes"]) field(form, name).disabled = openai;
+}
+
 function populateSettings() {
   const form = $("#settings-form");
   const { extraction, inbox, export: exportSettings } = state.settings;
   for (const [name, value] of Object.entries({
     llmEnabled: state.settings.llmEnabled,
+    provider: extraction.provider,
+    model: extraction.model,
     baseUrl: extraction.baseUrl,
     token: extraction.token,
     extractPath: extraction.extractPath,
@@ -408,6 +430,7 @@ function populateSettings() {
     if (control.type === "checkbox") control.checked = Boolean(value);
     else control.value = value ?? "";
   }
+  syncConnectionFields();
 }
 
 async function saveSettings(event) {
@@ -416,7 +439,9 @@ async function saveSettings(event) {
   const form = event.currentTarget;
   const number = (name) => Number(field(form, name).value);
   const text = (name) => field(form, name).value.trim();
-  const url = text("baseUrl");
+  const openai = text("provider") === "openai";
+  if (openai && (!text("model") || !text("token"))) return notice("Enter your OpenAI model and API key.");
+  const url = openai ? "https://api.openai.com/v1" : text("baseUrl");
   const inboxUrl = text("inboxBaseUrl");
   for (const candidate of [url, inboxUrl].filter(Boolean)) {
     if (!/^https:\/\//i.test(candidate)) return notice("API and inbox base URLs must use HTTPS.");
@@ -424,20 +449,22 @@ async function saveSettings(event) {
   }
   monitor?.markStale();
   if (url && field(form, "llmEnabled").checked) {
-    try { await ensureOriginPermission(endpoint({ baseUrl: url }, text("statusPath") || "/llm/status"), true); }
+    try { await ensureOriginPermission(openai ? OPENAI_EXTRACT_URL : endpoint({ baseUrl: url }, text("statusPath") || "/llm/status"), true); }
     catch (error) { notice(error.message); }
   }
   state.settings.llmEnabled = field(form, "llmEnabled").checked;
   Object.assign(state.settings.extraction, {
+    provider: openai ? "openai" : "vps",
+    model: text("model") || DEFAULT_SETTINGS.extraction.model,
     baseUrl: url,
     token: field(form, "token").value,
-    extractPath: text("extractPath") || "/extract-job",
+    extractPath: openai ? "/v1/chat/completions" : text("extractPath") || "/extract-job",
     statusPath: text("statusPath") || "/llm/status",
     wakePath: text("wakePath") || "/llm/wake",
     timeoutSeconds: Math.min(600, Math.max(10, number("timeoutSeconds") || 180)),
     maxInputChars: Math.min(200000, Math.max(1000, number("maxInputChars") || 30000)),
-    supportsStatus: field(form, "supportsStatus").checked,
-    supportsWake: field(form, "supportsWake").checked,
+    supportsStatus: !openai && field(form, "supportsStatus").checked,
+    supportsWake: !openai && field(form, "supportsWake").checked,
     promptMode: field(form, "promptMode").value,
     systemPrompt: field(form, "systemPrompt").value,
     extraInstructions: field(form, "extraInstructions").value
@@ -478,12 +505,13 @@ async function init() {
   monitor.start();
   populateSettings();
   renderJobs();
+  field($("#settings-form"), "provider").addEventListener("change", () => syncConnectionFields(true));
   $("#model-status").addEventListener("click", onModelButton);
   $("#llm-enabled").addEventListener("change", async (event) => {
     markActivity();
     state.settings.llmEnabled = event.target.checked;
     if (event.target.checked && state.settings.extraction.baseUrl) {
-      try { await ensureOriginPermission(endpoint(state.settings.extraction, state.settings.extraction.statusPath), true); }
+      try { await ensureOriginPermission(extractionEndpoint(state.settings.extraction), true); }
       catch (error) { notice(error.message); }
     }
     await persist();

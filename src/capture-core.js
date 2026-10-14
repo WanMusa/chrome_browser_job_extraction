@@ -1,7 +1,8 @@
+(() => {
 const NOISE = /\b(?:skip to content|sign in|log in|create an account|cookie preferences|related jobs|similar jobs|advertise with us|report this job|job alert)\b/i;
 const ZERO_WIDTH = /[\u200B-\u200D\uFEFF]/g;
 
-export function cleanText(text) {
+function cleanText(text) {
   return String(text || "")
     .replace(ZERO_WIDTH, "")
     .replace(/\r\n?/g, "\n")
@@ -48,7 +49,7 @@ function canonicalUrl(url) {
   }
 }
 
-export function extractPage(document, location, selectionText = "", mode = "page") {
+function extractPage(document, location, selectionText = "", mode = "page") {
   const host = location.hostname.toLowerCase();
   const isSeek = /(^|\.)seek\.(com\.au|co\.nz|co\.uk|com)$/.test(host);
   const isLinkedIn = host === "linkedin.com" || host.endsWith(".linkedin.com");
@@ -118,4 +119,5 @@ export function extractPage(document, location, selectionText = "", mode = "page
   };
 }
 
-if (typeof globalThis !== "undefined") globalThis.JobCaptureCore = { extractPage };
+globalThis.JobCaptureCore = { cleanText, extractPage };
+})();

@@ -32,14 +32,17 @@
         <aside id="job-list" aria-label="Saved jobs"></aside>
         <article id="job-detail" aria-live="polite"><p>Select a job to review it.</p></article>
       </div>
-      <p id="notice" class="notice" role="status"></p>
     </section>
     <section id="settings-view" hidden>
       <form id="settings-form">
         <h2>Extraction connection</h2>
         <label class="check"><input name="llmEnabled" type="checkbox"> Enable LLM refinement (default off)</label>
+        <label>Provider
+          <select name="provider"><option value="vps">VPS extraction API (Gemma)</option><option value="openai">OpenAI (direct)</option></select>
+        </label>
+        <label id="openai-model" hidden>OpenAI model <input name="model" type="text" placeholder="gpt-4.1-mini"></label>
         <label>HTTPS API base URL <input name="baseUrl" type="url" placeholder="https://localgemma.wanagents.duckdns.org"></label>
-        <label>API bearer token <input name="token" type="password" autocomplete="new-password"></label>
+        <label><span id="connection-token-label">API bearer token</span> <input name="token" type="password" autocomplete="new-password"></label>
         <div class="grid">
           <label>Extract path <input name="extractPath" type="text"></label>
           <label>Status path <input name="statusPath" type="text"></label>
@@ -51,7 +54,7 @@
         <label class="check"><input name="supportsStatus" type="checkbox"> API supports model status</label>
         <label class="check"><input name="supportsWake" type="checkbox"> API supports model wake</label>
         <label>Prompt mode
-          <select name="promptMode"><option value="server">Server-managed instructions</option><option value="custom">Custom override</option></select>
+          <select name="promptMode"><option value="server">Default instructions</option><option value="custom">Custom override</option></select>
         </label>
         <label>Custom system prompt override <textarea name="systemPrompt" rows="4"></textarea></label>
         <label>Extra instructions <textarea name="extraInstructions" rows="3"></textarea></label>
@@ -73,6 +76,7 @@
         <button type="submit">Save settings</button>
       </form>
     </section>
+    <p id="notice" class="notice" role="status"></p>
   </main>
   <script type="module" src="src/workspace.js"></script>
 </body>

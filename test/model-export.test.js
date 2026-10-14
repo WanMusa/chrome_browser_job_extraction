@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createJob, exportJob } from "../src/model.js";
 import { toCsv, toMarkdown } from "../src/export.js";
 import { parseRefinement, refinementFailure } from "../src/refinement.js";
-import { requestRefinement } from "../src/extraction-api.js";
+import { extractionEndpoint, OPENAI_EXTRACT_URL, requestRefinement } from "../src/extraction-api.js";
 
 const source = {
   source_url: "https://example.com/job/1",
@@ -74,6 +74,48 @@ test("refinement sends only cleaned text and small metadata to the mocked API", 
   ]);
   assert.equal(JSON.parse(requested.options.body).cleaned_text, source.description_text);
   assert.equal(JSON.stringify(requested).includes("<html"), false);
+});
+
+test("direct OpenAI uses the official endpoint and maps chat content into refinement fields", async () => {
+  const profile = { provider: "openai", model: "gpt-4.1-mini", token: "test-key", timeoutSeconds: 15 };
+  assert.equal(extractionEndpoint(profile), OPENAI_EXTRACT_URL);
+  assert.equal(extractionEndpoint({ baseUrl: "https://vps.example", extractPath: "/extract-job" }), "https://vps.example/extract-job");
+  let requested;
+  const data = await requestRefinement(async (url, options) => {
+    requested = { url, options };
+    return { ok: true, json: async () => ({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ title: "Engineer", skills: ["SQL"], requirements: ["5+ years experience"] }) } }] }) };
+  }, OPENAI_EXTRACT_URL, profile, createJob(source));
+  const body = JSON.parse(requested.options.body);
+  assert.equal(requested.url, OPENAI_EXTRACT_URL);
+  assert.equal(requested.options.headers.Authorization, "Bearer test-key");
+  assert.equal(body.model, profile.model);
+  assert.deepEqual(body.response_format, { type: "json_object" });
+  assert.equal(body.stream, false);
+  assert.equal(JSON.parse(body.messages[1].content).cleaned_text, source.description_text);
+  assert.match(body.messages[0].content, /numeric thresholds/);
+  assert.deepEqual(parseRefinement(data).skills, ["SQL"]);
+  assert.equal(JSON.stringify(body).includes(profile.token), false);
+});
+
+test("direct OpenAI validates configuration before sending credentials", async () => {
+  const fetcher = () => { throw new Error("Must not send a request"); };
+  const profile = { provider: "openai", model: "gpt-4.1-mini", token: "test-key", timeoutSeconds: 15 };
+  await assert.rejects(requestRefinement(fetcher, "https://other.example", profile, createJob(source)), /api.openai.com/);
+  await assert.rejects(requestRefinement(fetcher, OPENAI_EXTRACT_URL, { ...profile, token: "" }, createJob(source)), /API key and model/);
+  await assert.rejects(requestRefinement(fetcher, OPENAI_EXTRACT_URL, { ...profile, model: "" }, createJob(source)), /API key and model/);
+});
+
+test("direct OpenAI rejects unusable responses and reports billing errors", async () => {
+  const profile = { provider: "openai", model: "gpt-4.1-mini", token: "test-key", timeoutSeconds: 15 };
+  for (const [choice, message] of [
+    [{ finish_reason: "length", message: { content: "{}" } }, /truncated/],
+    [{ message: { refusal: "Declined" } }, /declined/],
+    [{ message: { content: "" } }, /no extraction content/],
+    [{ message: { content: "{invalid" } }, /malformed refinement JSON/]
+  ]) {
+    await assert.rejects(requestRefinement(async () => ({ ok: true, json: async () => ({ choices: [choice] }) }), OPENAI_EXTRACT_URL, profile, createJob(source)), message);
+  }
+  await assert.rejects(requestRefinement(async () => ({ ok: false, status: 429 }), OPENAI_EXTRACT_URL, profile, createJob(source)), /billing, quota, and rate limits/);
 });
 
 test("a mocked request timeout is reported as interrupted, not completed", async () => {

@@ -11,7 +11,7 @@ export function statusIsStale(lastChecked, now = Date.now(), maxAgeMs = 60_000) 
 }
 
 export class StatusMonitor {
-  constructor({ getInactivityMinutes, onStale, onTimeout, now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout, setIntervalTimer = setInterval, clearIntervalTimer = clearInterval }) {
+  constructor({ getInactivityMinutes, onStale, onTimeout, now = Date.now, setTimer = (...args) => globalThis.setTimeout(...args), clearTimer = (...args) => globalThis.clearTimeout(...args), setIntervalTimer = (...args) => globalThis.setInterval(...args), clearIntervalTimer = (...args) => globalThis.clearInterval(...args) }) {
     this.getInactivityMinutes = getInactivityMinutes;
     this.onStale = onStale;
     this.onTimeout = onTimeout;

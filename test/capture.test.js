@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanText, extractPage } from "../src/capture-core.js";
+import { readFileSync } from "node:fs";
+import { createContext, runInContext } from "node:vm";
+import "../src/capture-core.js";
+
+const { cleanText, extractPage } = globalThis.JobCaptureCore;
 
 class Fixture {
   constructor(text) { this.innerText = text; this.textContent = text; }
@@ -15,6 +19,31 @@ function fixture(host, selectors, body = "") {
     querySelector(selector) { return selectors[selector] ? new Fixture(selectors[selector]) : null; }
   };
 }
+
+test("classic script injection supports page and selection capture repeatedly", () => {
+  const coreSource = readFileSync(new URL("../src/capture-core.js", import.meta.url), "utf8");
+  const contentSource = readFileSync(new URL("../src/content.js", import.meta.url), "utf8");
+  const listeners = [];
+  const context = createContext({
+    URL,
+    document: fixture("example.com", { article: "Requirements\n5 years of Python experience", h1: "Engineer" }),
+    location: new URL("https://example.com/jobs/1"),
+    window: { getSelection: () => ({ toString: () => "Selected advert\n10 years experience" }) },
+    chrome: { runtime: { onMessage: { addListener: (listener) => listeners.push(listener) } } }
+  });
+  for (const mode of ["page", "selection", "page"]) {
+    runInContext(coreSource, context);
+    runInContext(contentSource, context);
+    assert.equal(listeners.length, 1);
+    let response;
+    listeners[0]({ type: "CAPTURE_VISIBLE_PAGE", mode }, {}, (value) => { response = value; });
+    assert.equal(response.ok, true, response.error);
+    assert.equal(response.captured.description_text, mode === "selection"
+      ? "Selected advert\n10 years experience"
+      : "Requirements\n5 years of Python experience");
+    assert.equal(response.captured.title, "Engineer");
+  }
+});
 
 test("cleaning removes clutter without summarizing requirements or thresholds", () => {
   const text = cleanText("Requirements\n5+ years of experience\nBachelor’s degree required\nSign in\nPython and SQL\nPython and SQL\n");

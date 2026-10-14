@@ -40,6 +40,35 @@ test("model status polls only while warming and inactivity threshold is respecte
   monitor.close();
 });
 
+test("default monitor timers retain the browser global receiver", (context) => {
+  const timerNames = ["setTimeout", "clearTimeout", "setInterval", "clearInterval"];
+  const originalTimers = Object.fromEntries(timerNames.map((name) => [name, globalThis[name]]));
+  const calls = [];
+  context.after(() => Object.assign(globalThis, originalTimers));
+  for (const name of timerNames) {
+    globalThis[name] = function () {
+      assert.equal(this, globalThis, `${name} must be called on the browser global`);
+      calls.push(name);
+      return calls.length;
+    };
+  }
+  const monitor = new StatusMonitor({
+    getInactivityMinutes: () => 10,
+    onStale: () => {},
+    onTimeout: () => {}
+  });
+  monitor.start();
+  monitor.observe("warming", () => {});
+  monitor.observe("ready", () => {});
+  monitor.start();
+  monitor.observe("warming", () => {});
+  monitor.close();
+  assert.deepEqual(calls, [
+    "setInterval", "setTimeout", "clearTimeout", "clearInterval",
+    "setInterval", "setTimeout", "clearTimeout", "clearInterval"
+  ]);
+});
+
 test("legacy storage migrates to the current version with defaults", async () => {
   let stored;
   globalThis.chrome = {
