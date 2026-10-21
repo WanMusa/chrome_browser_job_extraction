@@ -2,6 +2,7 @@ export const SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS = Object.freeze({
   inbox: { baseUrl: "", token: "", path: "/jobs", enabled: false },
+  jobRuns: { baseUrl: "", token: "" },
   export: {
     format: "json",
     saveAs: true
@@ -51,6 +52,7 @@ export function normalizeState(input) {
     jobs,
     settings: {
       inbox: { ...DEFAULT_SETTINGS.inbox, ...(oldSettings.inbox || {}) },
+      jobRuns: { ...DEFAULT_SETTINGS.jobRuns, ...(oldSettings.jobRuns || {}) },
       export: {
         format: ["json", "csv", "markdown"].includes(oldSettings.export?.format) ? oldSettings.export.format : DEFAULT_SETTINGS.export.format,
         saveAs: oldSettings.export?.saveAs ?? DEFAULT_SETTINGS.export.saveAs

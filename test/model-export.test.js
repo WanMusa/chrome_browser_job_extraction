@@ -30,7 +30,19 @@ test("legacy jobs migrate without changing source text or retaining removed fiel
   assert.equal(migrated.schemaVersion, SCHEMA_VERSION);
   assert.deepEqual(migrated.jobs[0], raw);
   assert.deepEqual(migrated.settings.export, { format: "csv", saveAs: false });
+  assert.deepEqual(migrated.settings.jobRuns, { baseUrl: "", token: "" });
   assert.equal("extraction" in migrated.settings, false);
+});
+
+test("Job Runs settings migrate independently from the inbox token", () => {
+  const migrated = normalizeState({ settings: {
+    inbox: { baseUrl: "https://inbox.example", token: "inbox-token" },
+    jobRuns: { baseUrl: "https://runs.example", token: "runs-token" }
+  } });
+  assert.deepEqual(migrated.settings.inbox, {
+    baseUrl: "https://inbox.example", token: "inbox-token", path: "/jobs", enabled: false
+  });
+  assert.deepEqual(migrated.settings.jobRuns, { baseUrl: "https://runs.example", token: "runs-token" });
 });
 
 test("export filenames use local MMDDYYYY, role, company and source with safe fallbacks", () => {

@@ -13,6 +13,7 @@
   <main>
     <nav class="tabs" aria-label="Workspace sections">
       <button data-view="jobs" class="active">Jobs <span id="job-count"></span></button>
+      <button data-view="job-runs">Job Runs</button>
       <button data-view="settings">Settings</button>
     </nav>
     <section id="jobs-view">
@@ -28,6 +29,14 @@
         <article id="job-detail" aria-live="polite"><p>Select a job to review it.</p></article>
       </div>
     </section>
+    <section id="job-runs-view" hidden>
+      <div class="run-toolbar">
+        <div><h2>Job Runs</h2><p class="muted">Most recent 50 resume-builder jobs.</p></div>
+        <button id="refresh-job-runs" class="secondary" type="button">Refresh</button>
+      </div>
+      <p id="job-runs-notice" class="notice" role="status"></p>
+      <div id="job-runs-list" class="job-runs-list" aria-label="Recent job runs"></div>
+    </section>
     <section id="settings-view" hidden>
       <form id="settings-form">
         <h2>Export behavior</h2>
@@ -40,6 +49,11 @@
         <label>Inbox HTTPS base URL <input name="inboxBaseUrl" type="url"></label>
         <label>Inbox path <input name="inboxPath" type="text"></label>
         <label>Inbox bearer token <input name="inboxToken" type="password" autocomplete="new-password"></label>
+
+        <h2>Job Runs API</h2>
+        <p class="muted">Uses a separate restricted token. Set the <code>JOB_RUNS_API_TOKEN</code> GitHub Actions secret, then deploy.</p>
+        <label>Job Runs API HTTPS base URL <input name="jobRunsBaseUrl" type="url" placeholder="https://wanagents.duckdns.org"></label>
+        <label>Job Runs API bearer token <input name="jobRunsToken" type="password" autocomplete="new-password"></label>
         <button type="submit">Save settings</button>
       </form>
     </section>

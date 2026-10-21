@@ -64,6 +64,16 @@ An optional HTTPS JSON POST inbox can be configured in Settings for a future res
 
 Capture reads the current page's text; it does not fetch job URLs or save raw HTML. Jobs and settings stay in `chrome.storage.local`. Storage access is restricted to trusted extension contexts. Inbox bearer tokens are local settings, not encrypted-vault credentials; never share them or commit them.
 
+The optional **Job Runs** tab connects to Resume Builder V3 using a separate
+`JOB_RUNS_API_TOKEN`, not the inbox token or broader operator `API_TOKEN`. Set the
+API base URL to `https://wanagents.duckdns.org`, configure the restricted token
+as a GitHub Actions secret and redeploy, then enter the base URL and token in
+Settings and grant the requested host permission. The tab refreshes the 50
+most recent jobs, opens available resumes through five-minute signed links, and
+offers **Retry** for failed jobs without a checkpoint or confirmed **Regenerate**
+for saved jobs. Regeneration makes fresh model calls and may incur cost. The
+token is stored in local Chrome storage; never share it or commit it.
+
 ## Validation
 
 `npm test` covers capture fidelity, scoped LinkedIn fallback, location matching, repeated script injection, menu/keyboard/popup routing, capture errors and queued saves, schema migration, export fields, and filename safety. `npm run build` checks JavaScript syntax. Chrome's native context menus, OS shortcut conflicts, real download prompts, and current website markup still require manual verification in Chrome.
