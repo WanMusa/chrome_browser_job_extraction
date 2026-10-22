@@ -40,7 +40,7 @@ test("Job Runs settings migrate independently from the inbox token", () => {
     jobRuns: { baseUrl: "https://runs.example", token: "runs-token" }
   } });
   assert.deepEqual(migrated.settings.inbox, {
-    baseUrl: "https://inbox.example", token: "inbox-token", path: "/jobs", enabled: false
+    baseUrl: "https://inbox.example", token: "inbox-token", path: "/resume/batches", enabled: false
   });
   assert.deepEqual(migrated.settings.jobRuns, { baseUrl: "https://runs.example", token: "runs-token" });
 });

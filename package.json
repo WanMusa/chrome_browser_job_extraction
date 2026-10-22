@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "node --check src/background.js && node --check src/content.js && node --check src/capture-core.js && node --check src/export.js && node --check src/extraction-api.js && node --check src/job-runs-api.js && node --check src/lifecycle.js && node --check src/model.js && node --check src/popup.js && node --check src/refinement.js && node --check src/storage.js && node --check src/workspace.js",
+    "build": "node --check src/background.js && node --check src/content.js && node --check src/capture-core.js && node --check src/export.js && node --check src/extraction-api.js && node --check src/inbox-api.js && node --check src/job-runs-api.js && node --check src/lifecycle.js && node --check src/model.js && node --check src/popup.js && node --check src/refinement.js && node --check src/storage.js && node --check src/workspace.js",
     "test": "node --test"
   }
 }

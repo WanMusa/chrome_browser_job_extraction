@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  fetchCoverLetterUrl,
   fetchJobRuns,
   fetchResumeUrl,
   regenerateJobRun,
@@ -56,4 +57,19 @@ test("rejects invalid URL, missing token, and API errors without exposing respon
   await assert.rejects(fetchJobRuns(() => { throw new Error("must not fetch"); }, { ...config, baseUrl: "http://wanagents.example" }), /HTTPS/);
   await assert.rejects(fetchJobRuns(() => { throw new Error("must not fetch"); }, { ...config, token: " " }), /token/);
   await assert.rejects(fetchJobRuns(async () => ({ ok: false, status: 503, json: async () => ({ detail: "private" }) }), config), /503/);
+});
+
+test("cover letter URL is fetched from its own signed-download endpoint", async () => {
+  let requestUrl;
+  const result = await fetchCoverLetterUrl(async (url) => {
+    requestUrl = url;
+    return { ok: true, status: 200,
+      json: async () => ({ url: "https://storage.example/cover-letter.docx", expires_in: 300 }) };
+  }, config, "run-1");
+  assert.equal(requestUrl, "https://wanagents.example/resume/job-runs/run-1/cover-letter-url");
+  assert.equal(result.expires_in, 300);
+  await assert.rejects(fetchCoverLetterUrl(async () => ({
+    ok: true, status: 200,
+    json: async () => ({ url: "http://storage.example/cover-letter.docx", expires_in: 300 })
+  }), config, "run-1"), /not HTTPS/);
 });

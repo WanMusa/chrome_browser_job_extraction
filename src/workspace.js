@@ -1,7 +1,8 @@
 import { exportJob, normalizeState, SCHEMA_VERSION } from "./model.js";
 import { loadState, saveState } from "./storage.js";
 import { exportFilename, toCsv, toMarkdown } from "./export.js";
-import { fetchJobRuns, fetchResumeUrl, regenerateJobRun, retryJobRun } from "./job-runs-api.js";
+import { submitJobBatch } from "./inbox-api.js";
+import { fetchCoverLetterUrl, fetchJobRuns, fetchResumeUrl, regenerateJobRun, retryJobRun } from "./job-runs-api.js";
 
 let state;
 let selectedId = null;
@@ -78,6 +79,12 @@ function renderJobRuns(runs) {
       open.addEventListener("click", handle(() => openResume(run)));
       actions.append(open);
     }
+    if (run.cover_letter_available) {
+      const download = safeText("button", "Download cover letter", "secondary");
+      download.type = "button";
+      download.addEventListener("click", handle(() => openCoverLetter(run)));
+      actions.append(download);
+    }
     if (run.can_regenerate) {
       const regenerate = safeText("button", "Regenerate");
       regenerate.type = "button";
@@ -117,6 +124,13 @@ async function openResume(run) {
   const config = jobRunsConfig();
   await ensureOriginPermission(`${new URL(config.baseUrl).origin}/`);
   const { url } = await fetchResumeUrl(fetch, config, run.id);
+  await chrome.tabs.create({ url });
+}
+
+async function openCoverLetter(run) {
+  const config = jobRunsConfig();
+  await ensureOriginPermission(`${new URL(config.baseUrl).origin}/`);
+  const { url } = await fetchCoverLetterUrl(fetch, config, run.id);
   await chrome.tabs.create({ url });
 }
 
@@ -264,14 +278,11 @@ async function sendSelected() {
   if (!inbox.enabled || !inbox.baseUrl || !inbox.path) return notice("Configure and enable an inbox in Settings first.");
   const url = endpoint(inbox);
   await ensureOriginPermission(url);
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(inbox.token ? { Authorization: `Bearer ${inbox.token}` } : {}) },
-    body: JSON.stringify({ schema_version: SCHEMA_VERSION, jobs: jobs.map(exportJob) }),
-    signal: AbortSignal.timeout(30_000)
-  });
-  if (!response.ok) throw new Error(`Inbox rejected the batch (${response.status}).`);
-  notice(`Sent ${jobs.length} job${jobs.length === 1 ? "" : "s"} to the configured inbox.`);
+  const receipt = await submitJobBatch(fetch, url, inbox.token, jobs.map(exportJob));
+  if (receipt.acceptedCount !== jobs.length || receipt.rejectedCount) {
+    return notice(`Resume Builder accepted ${receipt.acceptedCount} of ${jobs.length} jobs${receipt.rejectedCount ? ` and reported ${receipt.rejectedCount} validation error(s)` : ""}. Batch ${receipt.batchId}.`);
+  }
+  notice(`Resume Builder accepted ${receipt.acceptedCount} job${receipt.acceptedCount === 1 ? "" : "s"}. Batch ${receipt.batchId}.`);
 }
 
 function field(form, name) {
@@ -302,7 +313,7 @@ async function saveSettings(event) {
   const form = event.currentTarget;
   const inbox = {
     baseUrl: field(form, "inboxBaseUrl").value.trim(),
-    path: field(form, "inboxPath").value.trim() || "/jobs",
+    path: field(form, "inboxPath").value.trim() || "/resume/batches",
     token: field(form, "inboxToken").value,
     enabled: field(form, "inboxEnabled").checked
   };

@@ -1,7 +1,7 @@
 export const SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  inbox: { baseUrl: "", token: "", path: "/jobs", enabled: false },
+  inbox: { baseUrl: "", token: "", path: "/resume/batches", enabled: false },
   jobRuns: { baseUrl: "", token: "" },
   export: {
     format: "json",

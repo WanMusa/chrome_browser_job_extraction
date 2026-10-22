@@ -61,6 +61,9 @@ CSV and Markdown remain batch exports. A single-job file uses the same descripti
 ## Inbox and privacy
 
 An optional HTTPS JSON POST inbox can be configured in Settings for a future resume generator. It receives `{ "schema_version": 2, "jobs": [...] }` only after you explicitly select **Send selected**. Sending stays disabled until configured and enabled. Endpoint paths must remain on the configured origin, and Chrome requests optional host access when needed.
+For Resume Builder V3, use base URL `https://wanagents.duckdns.org` and inbox
+path `/resume/batches`. A send is confirmed only when the endpoint returns a
+Resume Builder batch ID and accepted job IDs.
 
 Capture reads the current page's text; it does not fetch job URLs or save raw HTML. Jobs and settings stay in `chrome.storage.local`. Storage access is restricted to trusted extension contexts. Inbox bearer tokens are local settings, not encrypted-vault credentials; never share them or commit them.
 
@@ -70,9 +73,10 @@ API base URL to `https://wanagents.duckdns.org`, configure the restricted token
 as a GitHub Actions secret and redeploy, then enter the base URL and token in
 Settings and grant the requested host permission. The tab refreshes the 50
 most recent jobs, opens available resumes through five-minute signed links, and
-offers **Retry** for failed jobs without a checkpoint or confirmed **Regenerate**
-for saved jobs. Regeneration makes fresh model calls and may incur cost. The
-token is stored in local Chrome storage; never share it or commit it.
+downloads available cover letters through five-minute signed links, and offers
+**Retry** for failed jobs without a checkpoint or confirmed **Regenerate** for
+saved jobs. Regeneration makes fresh model calls and may incur cost. The token is
+stored in local Chrome storage; never share it or commit it.
 
 ## Validation
 

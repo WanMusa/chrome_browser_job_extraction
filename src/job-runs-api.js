@@ -52,3 +52,13 @@ export async function fetchResumeUrl(fetcher, config, id) {
   if (signed.protocol !== "https:") throw new Error("The resume download link is not HTTPS.");
   return result;
 }
+
+export async function fetchCoverLetterUrl(fetcher, config, id) {
+  const result = await request(fetcher, config, `/${encodeURIComponent(id)}/cover-letter-url`);
+  if (!result || typeof result.url !== "string" || !Number.isFinite(result.expires_in)) {
+    throw new Error("The API returned an invalid cover letter download link.");
+  }
+  const signed = new URL(result.url);
+  if (signed.protocol !== "https:") throw new Error("The cover letter download link is not HTTPS.");
+  return result;
+}
